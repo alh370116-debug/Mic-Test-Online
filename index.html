@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Futuristic Mic Test</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap');
+
+body{
+  margin:0;
+  padding:0;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:radial-gradient(circle at top, #0f172a 0%, #050811 100%);
+  font-family:'Orbitron', sans-serif;
+  color:#00ffea;
+  overflow:hidden;
+}
+
+h1{
+  font-size:3em;
+  text-shadow:0 0 15px #00ffea,0 0 30px #00ffd5;
+  margin-bottom:20px;
+}
+
+button{
+  background:linear-gradient(90deg,#00ffea,#00bfff);
+  border:none;
+  padding:15px 30px;
+  font-size:18px;
+  border-radius:12px;
+  cursor:pointer;
+  color:#050811;
+  font-weight:bold;
+  margin:5px;
+  transition:0.3s;
+  box-shadow:0 0 20px #00ffea,0 0 40px #00bfff;
+}
+
+button:hover{
+  transform:scale(1.1);
+  box-shadow:0 0 40px #00ffea,0 0 80px #00bfff;
+}
+
+#deviceChoice{
+  margin-top:20px;
+  display:none;
+}
+
+select{
+  margin-top:20px;
+  padding:12px;
+  font-size:16px;
+  border-radius:10px;
+  border:none;
+  display:none;
+  background:rgba(0,255,234,0.2);
+  color:#00ffea;
+  font-weight:bold;
+  text-shadow:0 0 5px #00ffea;
+}
+
+#meterContainer{
+  margin-top:40px;
+  width:500px;
+  height:120px;
+  background:rgba(0,0,0,0.2);
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 0 30px #00ffea inset;
+  position:relative;
+}
+
+canvas{
+  position:absolute;
+  top:0;
+  left:0;
+}
+
+</style>
+</head>
+<body>
+
+<h1>🎤 Futuristic Mic Test</h1>
+
+<button id="startBtn">Start Test</button>
+
+<div id="deviceChoice">
+  <p>Select your device</p>
+  <button id="mobileBtn">Mobile</button>
+  <button id="pcBtn">PC</button>
+</div>
+
+<select id="micSelect"></select>
+
+<div id="meterContainer">
+  <canvas id="waveCanvas" width="500" height="120"></canvas>
+</div>
+
+<script>
+let audioContext, analyser, dataArray, stream;
+let startBtn=document.getElementById("startBtn");
+let deviceChoice=document.getElementById("deviceChoice");
+let mobileBtn=document.getElementById("mobileBtn");
+let pcBtn=document.getElementById("pcBtn");
+let micSelect=document.getElementById("micSelect");
+let canvas=document.getElementById("waveCanvas");
+let ctx=canvas.getContext("2d");
+
+startBtn.onclick=()=>{ deviceChoice.style.display="block"; };
+
+mobileBtn.onclick=async()=>{
+  deviceChoice.style.display="none";
+  stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  startMic(stream);
+};
+
+pcBtn.onclick=async()=>{
+  deviceChoice.style.display="none";
+  const devices=await navigator.mediaDevices.enumerateDevices();
+  micSelect.innerHTML="";
+  micSelect.style.display="block";
+  devices.forEach(d=>{
+    if(d.kind==="audioinput"){
+      const option=document.createElement("option");
+      option.value=d.deviceId;
+      option.text=d.label || "Microphone";
+      micSelect.appendChild(option);
+    }
+  });
+  stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  startMic(stream);
+};
+
+micSelect.onchange=async()=>{
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream=await navigator.mediaDevices.getUserMedia({
+    audio:{deviceId:{exact:micSelect.value}}
+  });
+  startMic(stream);
+};
+
+function startMic(stream){
+  audioContext=new AudioContext();
+  const source=audioContext.createMediaStreamSource(stream);
+  analyser=audioContext.createAnalyser();
+  analyser.fftSize=512;
+  source.connect(analyser);
+  dataArray=new Uint8Array(analyser.frequencyBinCount);
+  drawWave();
+}
+
+function drawWave(){
+  analyser.getByteTimeDomainData(dataArray);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.beginPath();
+  let sliceWidth = canvas.width * 1.0 / dataArray.length;
+  let x = 0;
+  for(let i=0;i<dataArray.length;i++){
+    let v = dataArray[i]/128.0;
+    let y = v * canvas.height/2;
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+    x += sliceWidth;
+  }
+  ctx.lineWidth=3;
+  ctx.strokeStyle='rgba(0,255,234,0.9)';
+  ctx.shadowColor="#00fff0";
+  ctx.shadowBlur=20;
+  ctx.stroke();
+  requestAnimationFrame(drawWave);
+}
+</script>
+
+</body>
+</html>
